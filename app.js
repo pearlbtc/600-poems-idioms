@@ -10,11 +10,27 @@
   // 全局兜底：任何未捕获错误显示在页面上，避免“白屏”无提示
   window.addEventListener("error", function (ev) {
     var v = document.getElementById("view");
-    if (v && !v.innerHTML.trim()) {
-      v.innerHTML = '<div class="empty">页面出错了：<br><code style="color:#a33">' +
-        (ev.message || ev.error || "unknown") + "</code><br>请刷新或清空本机进度。</div>";
+    if (v) {
+      var txt = v.innerText || v.textContent || "";
+      if (!txt.trim()) {
+        v.innerHTML = '<div class="empty">页面出错了：<br><code style="color:#a33">' +
+          (ev.message || ev.error || "unknown") + "</code><br>请刷新或清空本机进度。</div>";
+      }
     }
   });
+
+  // 启动诊断：1 秒后若主区域仍无可见内容，主动显示诊断信息（对付 file:// 下 data.js 未加载/JS 中断等）
+  setTimeout(function () {
+    var v = document.getElementById("view");
+    if (!v) return;
+    var txt = v.innerText || v.textContent || "";
+    if (txt.trim()) return;
+    v.innerHTML = '<div class="empty">主区域暂无内容。<br>' +
+      'ENTRIES=' + (window.ENTRIES ? window.ENTRIES.length : "未加载") +
+      ', COLLECTIONS=' + (window.COLLECTIONS ? window.COLLECTIONS.length : "未加载") +
+      ', state=' + (typeof state !== "undefined" ? "已初始化" : "未初始化") +
+      '<br>请刷新页面；若本地 file:// 打开，可尝试用浏览器“打开文件”或部署到线上访问。</div>';
+  }, 1000);
 
   var HAN = /[一-龥]/;
   var STORE_KEY = "mjjb_state_v1";
@@ -76,6 +92,8 @@
       if (!s || typeof s !== "object") return defaultState();
       var d = defaultState();
       for (var k in d) if (!(k in s)) s[k] = d[k];
+      // 防全取消文集导致空集合
+      if (!Array.isArray(s.collections) || !s.collections.length) s.collections = d.collections.slice();
       return s;
     } catch (e) { return defaultState(); }
   }
@@ -94,7 +112,10 @@
     return d.getFullYear() + "-" + m + "-" + day;
   }
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-  function selectedEntries() { return api.getEntries(state.collections); }
+  function selectedEntries() {
+    var cols = (state.collections && state.collections.length) ? state.collections : ["cy"];
+    return api.getEntries(cols);
+  }
 
   // 确保今日学习组已生成
   function ensureDailyGroup() {
@@ -204,6 +225,10 @@
   function renderStudy() {
     ensureDailyGroup();
     var ids = state.learnedToday.ids;
+    if (!ids || !ids.length) {
+      view.innerHTML = '<div class="empty">今日学习组为空。<br>可能是 data.js 未加载，或所有文集被取消。</div>';
+      return;
+    }
     studyIdx = state.studyIdx || 0;
     if (studyIdx >= ids.length) studyIdx = ids.length - 1;
     if (studyIdx < 0) studyIdx = 0;
@@ -708,6 +733,10 @@
   }
 
   /* ---------------- 启动 ---------------- */
-  ensureDailyGroup();
-  setTab("study");
+  if (!ENTRIES.length) {
+    view.innerHTML = '<div class="empty">数据未加载（ENTRIES 为空）。<br>请确认 data.js 与 index.html 在同一目录，并刷新页面。</div>';
+  } else {
+    ensureDailyGroup();
+    setTab("study");
+  }
 })();
