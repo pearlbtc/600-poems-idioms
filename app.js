@@ -7,6 +7,15 @@
 (function () {
   "use strict";
 
+  // 全局兜底：任何未捕获错误显示在页面上，避免“白屏”无提示
+  window.addEventListener("error", function (ev) {
+    var v = document.getElementById("view");
+    if (v && !v.innerHTML.trim()) {
+      v.innerHTML = '<div class="empty">页面出错了：<br><code style="color:#a33">' +
+        (ev.message || ev.error || "unknown") + "</code><br>请刷新或清空本机进度。</div>";
+    }
+  });
+
   var HAN = /[一-龥]/;
   var STORE_KEY = "mjjb_state_v1";
   var ROUND_CAP = 300;         // 每轮题量封顶，防离谱
@@ -70,7 +79,10 @@
       return s;
     } catch (e) { return defaultState(); }
   }
-  function saveState(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+  function saveState(s) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+    catch (e) { /* file:// 或隐私模式下 localStorage 可能不可用，静默降级为内存态 */ }
+  }
 
   var state = api.loadState();
 
@@ -665,7 +677,7 @@
     // 统计
     html += '<div class="stat-grid">';
     html += '  <div class="stat"><div class="v">' + state.round + "</div><div class='k'>当前轮次</div></div>";
-    html += '  <div class="stat"><div class="v">' + Math.min(ROUND_CAP, 10 * state.round) + "</div><div class='k'>本轮题量</div></div>";
+    html += '  <div class="stat"><div class="v">' + Math.min(ROUND_CAP, roundCount(state.round)) + "</div><div class='k'>本轮题量</div></div>";
     html += '  <div class="stat"><div class="v">' + masteredCount + "</div><div class='k'>已掌握条数</div></div>";
     html += '  <div class="stat"><div class="v">' + state.favorites.length + "</div><div class='k'>收藏条数</div></div>";
     html += "</div>";

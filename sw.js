@@ -1,5 +1,5 @@
 /* 每天进步一点点 — Service Worker：离线缓存，让网页版在手机上像原生 App 一样可用 */
-const CACHE = "mtbj-v1";
+const CACHE = "mtbj-v2";
 const CORE = [
   "./",
   "index.html",
