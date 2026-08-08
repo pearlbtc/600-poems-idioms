@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""解析《200个绝美的诗词成语.md》-> 结构化数据 (data.js + entries.json)"""
+"""解析《600个绝美的诗词成语.md》-> 结构化数据 (data.js + entries.json)"""
 import re, json, os
 
-SRC = r"D:\WorkBuddy\CQ\200个绝美的诗词成语.md"
+SRC = r"D:\WorkBuddy\CQ\600个绝美的诗词成语.md"
 OUT_DIR = r"D:\WorkBuddy\CQ\每天进步一点点"
 HAN = re.compile(r"[\u4e00-\u9fff]")
 
-COLLECTIONS = [{"id": "cy", "name": "200个绝美的诗词成语"}]
+COLLECTIONS = [{"id": "cy", "name": "600个绝美的诗词成语，每一个背后都有故事"}]
 
 def cat_name(h2):
     # "## 一、光阴如流水·岁月不等人" -> "光阴如流水"
@@ -63,7 +63,7 @@ def main():
         i += 1
 
     entries.sort(key=lambda e: e["id"])
-    # 校验 id 连续 1..200
+    # 校验 id 连续 1..600
     ids = [e["id"] for e in entries]
     print("解析条数:", len(entries))
     print("id范围:", ids[0], "~", ids[-1], "连续:", ids == list(range(1, len(entries)+1)))

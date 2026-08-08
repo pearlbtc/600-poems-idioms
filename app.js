@@ -9,7 +9,13 @@
 
   var HAN = /[一-龥]/;
   var STORE_KEY = "mjjb_state_v1";
-  var ROUND_CAP = 50;          // 每轮题量封顶，防离谱
+  var ROUND_CAP = 300;         // 每轮题量封顶，防离谱
+  // 每轮题量：第1轮10题、第2轮20题、第3轮40题、第4轮60题、第5轮100题；第6轮起每轮+40
+  var ROUND_TABLE = [10, 20, 40, 60, 100];
+  function roundCount(round) {
+    if (round >= 1 && round <= ROUND_TABLE.length) return ROUND_TABLE[round - 1];
+    return 100 + 40 * (round - ROUND_TABLE.length);
+  }
   var GROUP_SIZE = 10;         // 每日学习一组条数
   var LIB_PAGE_SIZE = 30;      // 诗词成语库每页条数
   var EASY_BANK_CAP = 50;      // 第一轮常用词池上限（便于按需扩充）
@@ -142,7 +148,7 @@
   }
 
   function buildQuiz() {
-    var count = Math.min(ROUND_CAP, 10 * state.round);
+    var count = Math.min(ROUND_CAP, roundCount(state.round));
     // 轮次池优先，且优先今日已学未掌握；都不够再补全书
     var roundIds = roundPool(state.round);
     var unmasteredRound = roundIds.filter(function (id) { return !state.mastered[id]; });
@@ -322,7 +328,7 @@
 
     var html = "";
     html += '<div class="progress">诗词成语库 · 共 ' + list.length + " 条</div>";
-    html += '<div class="lib-cover"><img src="assets/cover.jpg" alt="200个绝美的诗词成语" /></div>';
+    html += '<div class="lib-cover"><img src="assets/cover.jpg" alt="600个绝美的诗词成语，每一个背后都有故事" /></div>';
     html += '<div class="lib-search"><input id="libQ" placeholder="搜索词条 / 释义 / 出处…" value="' + libQ.replace(/"/g, "&quot;") + '" /></div>';
     html += '<div class="lib-cats" id="libCats">';
     html += '<span class="lib-cat' + (libCat === "all" ? " on" : "") + '" data-c="all">全部</span>';
@@ -405,7 +411,7 @@
 
   /* ---------------- 考核 ---------------- */
   function renderQuizHome() {
-    var count = Math.min(ROUND_CAP, 10 * state.round);
+    var count = Math.min(ROUND_CAP, roundCount(state.round));
     var best = state.best[state.round] || 0;
     var masteredCount = Object.keys(state.mastered).length;
     var html = "";
@@ -653,7 +659,7 @@
     COLLECTIONS.forEach(function (c) {
       var on = state.collections.indexOf(c.id) >= 0;
       html += '<div class="set-row"><div><div class="lab">' + c.name + '</div>';
-      html += '<div class="desc">' + (c.id === "cy" ? "已收录 200 条" : "即将上线") + "</div></div>";
+      html += '<div class="desc">' + (c.id === "cy" ? "已收录 600 条" : "即将上线") + "</div></div>";
       html += '<div class="switch ' + (on ? "on" : "") + '" data-col="' + c.id + '"></div></div>';
     });
     // 统计
