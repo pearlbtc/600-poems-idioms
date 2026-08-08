@@ -129,7 +129,8 @@
       if (HAN.test(ch)) { tokens.push({ ch: ch, punct: false }); hanIdx.push(tokens.length - 1); }
       else { tokens.push({ ch: ch, punct: true }); }
     }
-    var hideCount = Math.round(entry.chars / 2);
+    // 填空字数：短词（成语等）保持挖约半数；诗句等较长句子最多挖 4 字，避免长句全空难答
+    var hideCount = Math.min(Math.round(entry.chars / 2), 4);
     var shuffled = hanIdx.slice().sort(function () { return Math.random() - 0.5; });
     var hideSet = {};
     shuffled.slice(0, hideCount).forEach(function (i) { hideSet[i] = true; });
