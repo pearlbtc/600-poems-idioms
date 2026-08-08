@@ -50,7 +50,9 @@
       favorites: [],         // [entryId]
       round: 1,
       best: {},              // {roundNo: 最好百分比}
-      collections: ["cy"]    // 勾选的文集
+      collections: ["cy"],   // 勾选的文集
+      lastView: "study",     // 上次所在 tab（自动接续用）
+      studyIdx: 0            // 学习栏当前条目索引（自动接续用）
     };
   }
   function loadState() {
@@ -162,16 +164,19 @@
   var view = document.getElementById("view");
   var tabs = document.querySelectorAll(".tab");
   var quiz = null;        // 当前考核会话
-  var studyIdx = 0;
+  var studyIdx = state.studyIdx || 0;
 
   function setTab(name) {
     tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.tab === name); });
+    if (state.lastView !== name) { state.lastView = name; saveState(state); }
     if (name === "lib") renderLib();
     else if (name === "study") renderStudy();
     else if (name === "fav") renderFav();
     else if (name === "quiz") renderQuizHome();
     else if (name === "me") renderMe();
   }
+  // 自动接续上次所在 tab
+  setTab(state.lastView || "study");
   tabs.forEach(function (t) {
     t.addEventListener("click", function () { setTab(t.dataset.tab); });
   });
@@ -180,8 +185,10 @@
   function renderStudy() {
     ensureDailyGroup();
     var ids = state.learnedToday.ids;
+    studyIdx = state.studyIdx || 0;
     if (studyIdx >= ids.length) studyIdx = ids.length - 1;
     if (studyIdx < 0) studyIdx = 0;
+    state.studyIdx = studyIdx;
     var e = BY_ID[ids[studyIdx]];
     var isFav = state.favorites.indexOf(e.id) >= 0;
     var html = "";
@@ -211,22 +218,46 @@
     };
     document.getElementById("reciteBtn").onclick = function () { playRecite(e.term); };
     document.getElementById("nextBtn").onclick = function () {
-      if (studyIdx < ids.length - 1) { studyIdx++; renderStudy(); }
+      if (studyIdx < ids.length - 1) { studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
       else { setTab("quiz"); }
     };
     document.getElementById("prevBtn").onclick = function () {
-      if (studyIdx > 0) { studyIdx--; renderStudy(); }
+      if (studyIdx > 0) { studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
     };
     bindSwipe(document.getElementById("studyCard"));
+    bindWheelNav();
   }
 
   function bindSwipe(el) {    var sy = 0;
     el.addEventListener("touchstart", function (e) { sy = e.touches[0].clientY; }, { passive: true });
     el.addEventListener("touchend", function (e) {
       var dy = e.changedTouches[0].clientY - sy;
-      if (dy > 60 && studyIdx > 0) { studyIdx--; renderStudy(); }
-      else if (dy < -60 && studyIdx < state.learnedToday.ids.length - 1) { studyIdx++; renderStudy(); }
+      if (dy > 60 && studyIdx > 0) { studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
+      else if (dy < -60 && studyIdx < state.learnedToday.ids.length - 1) { studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
     }, { passive: true });
+  }
+
+  // PC 端鼠标滚轮下滑/上滑 = 下一条/上一条（仅学习栏生效；触屏手机继续走 bindSwipe）
+  function bindWheelNav() {
+    if (bindWheelNav._bound) return;
+    bindWheelNav._bound = true;
+    view.addEventListener("wheel", function (e) {
+      var active = document.querySelector(".tab.active");
+      if (!active || active.dataset.tab !== "study") return;
+      e.preventDefault();
+      bindWheelNav.acc = (bindWheelNav.acc || 0) + e.deltaY;
+      var now = Date.now();
+      if (now - (bindWheelNav.lastT || 0) > 800) bindWheelNav.acc = 0;
+      bindWheelNav.lastT = now;
+      if (bindWheelNav.acc > 60) {
+        var ids = state.learnedToday.ids;
+        if (studyIdx < ids.length - 1) { studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
+        bindWheelNav.acc = 0;
+      } else if (bindWheelNav.acc < -60) {
+        if (studyIdx > 0) { studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
+        bindWheelNav.acc = 0;
+      }
+    }, { passive: false });
   }
 
   /* ---------------- 诵读（央视风） ---------------- */
