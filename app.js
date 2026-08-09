@@ -149,6 +149,23 @@ try { (function () {
     saveState(state);
   }
 
+  // 主动生成下一组学习内容（不考核）
+  function nextStudyGroup() {
+    stopRecite();
+    var pool = selectedEntries().map(function (e) { return e.id; });
+    var ids = [];
+    var bag = pool.slice();
+    for (var i = 0; i < GROUP_SIZE && bag.length; i++) {
+      var idx = Math.floor(Math.random() * bag.length);
+      ids.push(bag.splice(idx, 1)[0]);
+    }
+    state.learnedToday = { date: today(), ids: ids };
+    state.studyIdx = 0;
+    studyIdx = 0;
+    saveState(state);
+    setTab("study");
+  }
+
   // 出题池：优先今日已学未掌握；全掌握后从勾选文集全量随机
   function quizPool() {
     var lt = state.learnedToday.ids;
@@ -499,12 +516,14 @@ try { (function () {
     html += '  <div><div class="k">历史最好</div><div class="v">' + best + " 分</div></div>";
     html += "</div>";
     html += '<div class="hint">规则：挖空填字，每轮满分 100 分，<b>&#8805;90 分</b>即可晋级下一轮。<br>第1轮用最熟悉常用的词，越往后越难。<br>题目优先出自今日已学内容，全部掌握后从全书随机。</div>';
-    html += '<div class="card-actions" style="margin-top:20px">';
+    html += '<div class="card-actions" style="margin-top:20px;flex-direction:column">';
     html += '  <button class="btn btn-primary" id="startBtn" style="font-size:17px;padding:13px 34px">开始第 ' + state.round + " 轮自测</button>";
+    html += '  <button class="btn btn-ghost" id="skipBtn" style="font-size:14px;padding:10px 24px;margin-top:8px">跳过测试，直接进入下一组学习</button>';
     html += "</div>";
     html += '<div class="hint">已掌握 ' + masteredCount + " / " + ENTRIES.length + " 条</div>";
     view.innerHTML = html;
     document.getElementById("startBtn").onclick = startQuiz;
+    document.getElementById("skipBtn").onclick = nextStudyGroup;
   }
 
   function startQuiz() {
