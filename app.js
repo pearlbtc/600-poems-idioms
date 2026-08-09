@@ -356,10 +356,11 @@ try { (function () {
     if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
     if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
   }
+  var AUDIO_MAX_ID = 200;  // 目前只有 id 1-200 有预生成音频；更高 ID 直接走 TTS
   function playRecite(id, text) {
     if (!text && id == null) return;
     stopRecite();
-    if (id == null) { speakFallback(text); return; }
+    if (id == null || id > AUDIO_MAX_ID) { speakFallback(text); return; }
     var au = new Audio("audio/" + id + ".mp3");
     _curAudio = au;
     _curFallbackTimer = setTimeout(function () {
