@@ -1,5 +1,5 @@
 /* 每天进步一点点 — Service Worker：离线缓存，让网页版在手机上像原生 App 一样可用 */
-const CACHE = "mtbj-v5";
+const CACHE = "mtbj-v6";
 const CORE = [
   "./",
   "index.html",
@@ -20,6 +20,10 @@ const CORE = [
   "assets/vol7.jpg",
   "assets/vol8.jpg"
 ];
+
+self.addEventListener("message", function (e) {
+  if (e.data === "skipWaiting") self.skipWaiting();
+});
 
 self.addEventListener("install", function (e) {
   e.waitUntil(
@@ -60,7 +64,26 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  // 其余资源：缓存优先；未命中则走网络并回填；网络失败回退首页
+  // JS/CSS/HTML：网络优先（确保用户永远拿到最新代码）；网络失败才回退缓存
+  var isCode = url.pathname.endsWith(".js") || url.pathname.endsWith(".css") || url.pathname.endsWith(".html") || url.pathname === "/" || url.pathname.endsWith("/");
+  if (isCode) {
+    e.respondWith(
+      fetch(req).then(function (res) {
+        if (res && res.ok && url.origin === self.location.origin) {
+          var copy = res.clone();
+          caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        }
+        return res;
+      }).catch(function () {
+        return caches.match(req).then(function (hit) {
+          return hit || caches.match("index.html");
+        });
+      })
+    );
+    return;
+  }
+
+  // 图片等其余资源：缓存优先；未命中则走网络并回填；网络失败回退首页
   e.respondWith(
     caches.match(req).then(function (hit) {
       if (hit) return hit;

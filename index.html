@@ -47,8 +47,21 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
-        navigator.serviceWorker.register("sw.js").catch(function (e) {
-          console.warn("SW 注册失败:", e);
+        navigator.serviceWorker.register("sw.js").then(function (reg) {
+          // 新 SW 接管后自动刷新一次，确保用户立刻拿到最新代码
+          if (reg.waiting) { reg.waiting.postMessage("skipWaiting"); }
+          reg.addEventListener("updatefound", function () {
+            var nw = reg.installing;
+            if (nw) nw.addEventListener("statechange", function () {
+              if (nw.state === "installed" && navigator.serviceWorker.controller) {
+                nw.postMessage("skipWaiting");
+              }
+            });
+          });
+        }).catch(function (e) { console.warn("SW 注册失败:", e); });
+        // SW 控制权变化时自动刷新
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          window.location.reload();
         });
       });
     }

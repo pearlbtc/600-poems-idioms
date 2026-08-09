@@ -278,7 +278,7 @@ try { (function () {
       if (i >= 0) state.favorites.splice(i, 1); else state.favorites.push(e.id);
       saveState(state); renderStudy();
     };
-    document.getElementById("reciteBtn").onclick = function () { playRecite(e.term); };
+    document.getElementById("reciteBtn").onclick = function () { playRecite(e.id, e.term); };
     document.getElementById("nextBtn").onclick = function () {
       stopRecite();
       if (studyIdx < ids.length - 1) { studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
@@ -356,11 +356,9 @@ try { (function () {
     if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
     if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
   }
-  function playRecite(text) {
-    if (!text) return;
+  function playRecite(id, text) {
+    if (!text && id == null) return;
     stopRecite();
-    var id = null;
-    for (var k in BY_ID) { if (BY_ID[k].term === text) { id = BY_ID[k].id; break; } }
     if (id == null) { speakFallback(text); return; }
     var au = new Audio("audio/" + id + ".mp3");
     _curAudio = au;
