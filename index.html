@@ -41,7 +41,7 @@
     </div>
   </div>
 
-  <!-- 数据先加载，再加载逻辑 -->
+  <!-- 数据先加载，再加载逻辑；file:// 协议下不能加 crossorigin，否则同目录脚本会被 CORS 拒绝 -->
   <script src="data.js"></script>
   <script src="app.js"></script>
   <script>

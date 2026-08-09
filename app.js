@@ -4,19 +4,27 @@
  *       api 层已抽象，后续把方法体换成 fetch 即可平滑升级为全栈。
  * 登录：游客占位，微信/手机号接口预留（见 me 页占位按钮）。
  * ============================================================ */
-(function () {
+try { (function () {
   "use strict";
 
   // 全局兜底：任何未捕获错误显示在页面上，避免“白屏”无提示
-  window.addEventListener("error", function (ev) {
+  window.showFatal = function (msg) {
     var v = document.getElementById("view");
-    if (v) {
-      var txt = v.innerText || v.textContent || "";
-      if (!txt.trim()) {
-        v.innerHTML = '<div class="empty">页面出错了：<br><code style="color:#a33">' +
-          (ev.message || ev.error || "unknown") + "</code><br>请刷新或清空本机进度。</div>";
-      }
-    }
+    if (!v) return;
+    v.innerHTML = '<div class="empty" style="text-align:left;padding:20px;">' +
+      '<div style="font-size:18px;margin-bottom:10px;">页面出错了</div>' +
+      '<pre style="background:#f8f0e8;padding:10px;border-radius:6px;overflow:auto;max-height:60vh;font-size:13px;line-height:1.5;color:#522;">' +
+      String(msg).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>' +
+      '<div style="margin-top:10px;">请截图此页，或尝试<a href="javascript:void(0)" onclick="localStorage.clear();location.reload()" style="color:#a33;text-decoration:underline;">清空本机进度并刷新</a>。</div></div>';
+  }
+  window.addEventListener("error", function (ev) {
+    var detail = (ev.message || ev.error && ev.error.message || "Script error");
+    if (ev.filename) detail += "\n文件: " + ev.filename + " 行:" + ev.lineno + " 列:" + ev.colno;
+    if (ev.error && ev.error.stack) detail += "\n堆栈:\n" + ev.error.stack;
+    showFatal(detail);
+  });
+  window.addEventListener("unhandledrejection", function (ev) {
+    showFatal("未处理的 Promise 错误:\n" + (ev.reason && ev.reason.stack || ev.reason || ""));
   });
 
   // 启动诊断：1 秒后若主区域仍无可见内容，主动显示诊断信息（对付 file:// 下 data.js 未加载/JS 中断等）
@@ -88,12 +96,22 @@
   }
   function loadState() {
     try {
-      var s = JSON.parse(localStorage.getItem(STORE_KEY));
-      if (!s || typeof s !== "object") return defaultState();
+      var raw = localStorage.getItem(STORE_KEY);
+      var s = raw ? JSON.parse(raw) : null;
+      if (!s || typeof s !== "object" || Array.isArray(s)) return defaultState();
       var d = defaultState();
-      for (var k in d) if (!(k in s)) s[k] = d[k];
-      // 防全取消文集导致空集合
+      // 严格字段类型校验：防止 localStorage 中残留异常状态导致启动崩溃
+      function isObj(v) { return v && typeof v === "object" && !Array.isArray(v); }
+      if (!isObj(s.learnedToday)) s.learnedToday = { date: "", ids: [] };
+      if (typeof s.learnedToday.date !== "string") s.learnedToday.date = "";
+      if (!Array.isArray(s.learnedToday.ids)) s.learnedToday.ids = [];
+      if (!isObj(s.mastered)) s.mastered = {};
+      if (!Array.isArray(s.favorites)) s.favorites = [];
+      if (typeof s.round !== "number" || !isFinite(s.round) || s.round < 1) s.round = 1;
+      if (!isObj(s.best)) s.best = {};
       if (!Array.isArray(s.collections) || !s.collections.length) s.collections = d.collections.slice();
+      if (typeof s.lastView !== "string") s.lastView = d.lastView;
+      if (typeof s.studyIdx !== "number" || !isFinite(s.studyIdx)) s.studyIdx = 0;
       return s;
     } catch (e) { return defaultState(); }
   }
@@ -215,8 +233,8 @@
     else if (name === "quiz") renderQuizHome();
     else if (name === "me") renderMe();
   }
-  // 自动接续上次所在 tab
-  setTab(state.lastView || "study");
+  // 自动接续上次所在 tab 延迟到变量全部初始化后再执行，避免 renderLib 访问未初始化的 libQ
+  // setTab(state.lastView || "study"); // 移到启动区
   tabs.forEach(function (t) {
     t.addEventListener("click", function () { setTab(t.dataset.tab); });
   });
@@ -733,10 +751,20 @@
   }
 
   /* ---------------- 启动 ---------------- */
-  if (!ENTRIES.length) {
-    view.innerHTML = '<div class="empty">数据未加载（ENTRIES 为空）。<br>请确认 data.js 与 index.html 在同一目录，并刷新页面。</div>';
-  } else {
-    ensureDailyGroup();
-    setTab("study");
+  try {
+    if (!ENTRIES.length) {
+      view.innerHTML = '<div class="empty">数据未加载（ENTRIES 为空）。<br>请确认 data.js 与 index.html 在同一目录，并刷新页面。</div>';
+    } else {
+      ensureDailyGroup();
+      setTab(state.lastView || "study");
+    }
+  } catch (e) {
+    window.showFatal("启动渲染失败:\n" + (e && e.stack || e));
   }
-})();
+})(); } catch (e) {
+  if (window.showFatal) window.showFatal("应用启动失败:\n" + (e && e.stack || e));
+  else {
+    var _v = document.getElementById("view");
+    if (_v) _v.innerHTML = '<div class="empty">应用启动失败，请刷新或清空本机进度。<br><pre>' + String(e && e.stack || e).replace(/</g, '&lt;') + '</pre></div>';
+  }
+}
