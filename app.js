@@ -280,10 +280,12 @@ try { (function () {
     };
     document.getElementById("reciteBtn").onclick = function () { playRecite(e.term); };
     document.getElementById("nextBtn").onclick = function () {
+      stopRecite();
       if (studyIdx < ids.length - 1) { studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
       else { setTab("quiz"); }
     };
     document.getElementById("prevBtn").onclick = function () {
+      stopRecite();
       if (studyIdx > 0) { studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
     };
     bindSwipe(document.getElementById("studyCard"));
@@ -294,8 +296,8 @@ try { (function () {
     el.addEventListener("touchstart", function (e) { sy = e.touches[0].clientY; }, { passive: true });
     el.addEventListener("touchend", function (e) {
       var dy = e.changedTouches[0].clientY - sy;
-      if (dy > 60 && studyIdx > 0) { studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
-      else if (dy < -60 && studyIdx < state.learnedToday.ids.length - 1) { studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
+      if (dy > 60 && studyIdx > 0) { stopRecite(); studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
+      else if (dy < -60 && studyIdx < state.learnedToday.ids.length - 1) { stopRecite(); studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
     }, { passive: true });
   }
 
@@ -313,10 +315,10 @@ try { (function () {
       bindWheelNav.lastT = now;
       if (bindWheelNav.acc > 60) {
         var ids = state.learnedToday.ids;
-        if (studyIdx < ids.length - 1) { studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
+        if (studyIdx < ids.length - 1) { stopRecite(); studyIdx++; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
         bindWheelNav.acc = 0;
       } else if (bindWheelNav.acc < -60) {
-        if (studyIdx > 0) { studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
+        if (studyIdx > 0) { stopRecite(); studyIdx--; state.studyIdx = studyIdx; saveState(state); renderStudy(); }
         bindWheelNav.acc = 0;
       }
     }, { passive: false });
@@ -347,15 +349,37 @@ try { (function () {
       window.speechSynthesis.speak(u);
     } catch (e) {}
   }
+  var _curAudio = null;
+  var _curFallbackTimer = null;
+  function stopRecite() {
+    if (_curAudio) { try { _curAudio.pause(); _curAudio.src = ""; } catch (e) {} _curAudio = null; }
+    if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
+    if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+  }
   function playRecite(text) {
     if (!text) return;
+    stopRecite();
     var id = null;
     for (var k in BY_ID) { if (BY_ID[k].term === text) { id = BY_ID[k].id; break; } }
     if (id == null) { speakFallback(text); return; }
     var au = new Audio("audio/" + id + ".mp3");
-    var fallbackTimer = setTimeout(function () { speakFallback(text); }, 1800);
-    au.oncanplay = function () { clearTimeout(fallbackTimer); au.play(); };
-    au.onerror = function () { clearTimeout(fallbackTimer); speakFallback(text); };
+    _curAudio = au;
+    _curFallbackTimer = setTimeout(function () {
+      _curFallbackTimer = null;
+      if (_curAudio === au) { try { _curAudio.pause(); _curAudio.src = ""; } catch (e) {} _curAudio = null; }
+      speakFallback(text);
+    }, 1800);
+    au.oncanplay = function () {
+      if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
+      if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+      au.play();
+    };
+    au.onerror = function () {
+      if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
+      if (_curAudio === au) _curAudio = null;
+      speakFallback(text);
+    };
+    au.onended = function () { if (_curAudio === au) _curAudio = null; };
     au.load();
   }
 
