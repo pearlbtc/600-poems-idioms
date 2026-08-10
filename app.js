@@ -374,11 +374,12 @@ try { (function () {
     if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
   }
   var AUDIO_MAX_ID = 600;  // 全部 600 条词条均有预生成音频
+  var AUDIO_V = 2;         // 音频缓存版本：v2 修复 26-200 错位，配合 SW v10 强制取新音频
   function playRecite(id, text) {
     if (!text && id == null) return;
     stopRecite();
     if (id == null || id > AUDIO_MAX_ID) { speakFallback(text); return; }
-    var au = new Audio("audio/" + id + ".mp3");
+    var au = new Audio("audio/" + id + ".mp3?v=" + AUDIO_V);
     _curAudio = au;
     _curFallbackTimer = setTimeout(function () {
       _curFallbackTimer = null;

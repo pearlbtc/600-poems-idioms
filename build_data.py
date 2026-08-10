@@ -1,9 +1,9 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """解析《600个绝美的诗词成语.md》-> 结构化数据 (data.js + entries.json)"""
 import re, json, os
 
-SRC = r"D:\WorkBuddy\CQ\600个绝美的诗词成语.md"
-OUT_DIR = r"D:\WorkBuddy\CQ\每天进步一点点"
+SRC = r"D:\WorkBuddy-CQ\600个绝美的诗词成语.md"
+OUT_DIR = r"D:\WorkBuddy-CQ\每天进步一点点"
 HAN = re.compile(r"[\u4e00-\u9fff]")
 
 COLLECTIONS = [{"id": "cy", "name": "600个绝美的诗词成语，每一个背后都有故事"}]

@@ -1,5 +1,5 @@
 /* 600个绝美的诗词成语在线学习小工具 — Service Worker：离线缓存，让网页版在手机上像原生 App 一样可用 */
-const CACHE = "mtbj-v9";
+const CACHE = "mtbj-v10";  // v10: 修复音频26-200错位，强制清旧缓存换新音频
 const CORE = [
   "./",
   "index.html",
