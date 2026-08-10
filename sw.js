@@ -1,4 +1,4 @@
-/* 每天进步一点点 — Service Worker：离线缓存，让网页版在手机上像原生 App 一样可用 */
+/* 600个绝美的诗词成语在线学习小工具 — Service Worker：离线缓存，让网页版在手机上像原生 App 一样可用 */
 const CACHE = "mtbj-v9";
 const CORE = [
   "./",
