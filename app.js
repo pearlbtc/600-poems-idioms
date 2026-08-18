@@ -110,6 +110,13 @@ try { (function () {
       if (typeof s.round !== "number" || !isFinite(s.round) || s.round < 1) s.round = 1;
       if (!isObj(s.best)) s.best = {};
       if (!Array.isArray(s.collections) || !s.collections.length) s.collections = d.collections.slice();
+      // 过滤掉 localStorage 中残留的、不在 COLLECTIONS 里的文集 ID（防御：状态污染导致列表为空）
+      else {
+        var validIds = {};
+        COLLECTIONS.forEach(function (c) { validIds[c.id] = 1; });
+        s.collections = s.collections.filter(function (id) { return validIds[id]; });
+        if (!s.collections.length) s.collections = d.collections.slice();
+      }
       if (typeof s.lastView !== "string") s.lastView = d.lastView;
       if (typeof s.studyIdx !== "number" || !isFinite(s.studyIdx)) s.studyIdx = 0;
       return s;

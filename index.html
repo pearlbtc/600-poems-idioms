@@ -41,9 +41,9 @@
     </div>
   </div>
 
-  <!-- 数据先加载，再加载逻辑；file:// 协议下不能加 crossorigin，否则同目录脚本会被 CORS 拒绝 -->
-  <script src="data.js"></script>
-  <script src="app.js"></script>
+  <!-- 数据先加载，再加载逻辑；file:// 协议下不能加 crossorigin，否则同目录脚本会被 CORS 拒绝。?v=11 绕过 GitHub Pages 的 10 分钟 max-age=600 HTTP 缓存。 -->
+  <script src="data.js?v=11"></script>
+  <script src="app.js?v=11"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
