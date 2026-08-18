@@ -16,7 +16,7 @@ def cat_name(h2):
         t = t.split("·", 1)[0]
     return t.strip()
 
-entry_re = re.compile(r"\*\*【(\d+)】(.*?)——(.*?)\*\*")
+entry_re = re.compile(r"\*{2,3}【(\d+)】(.*?)——(.*?)\*{2,3}")
 
 def main():
     text = open(SRC, encoding="utf-8").read()
@@ -42,7 +42,8 @@ def main():
             j = i + 1
             while j < n:
                 nl = lines[j].strip()
-                if nl.startswith("**【") or nl.startswith("## ") or nl == "---":
+                if (nl.startswith("**【") or nl.startswith("***【") 
+                    or nl.startswith("## ") or nl == "---"):
                     break
                 if nl:
                     meaning_lines.append(nl)
