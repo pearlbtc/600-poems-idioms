@@ -397,7 +397,7 @@ try { (function () {
     if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
   }
   var AUDIO_MAX_ID = 600;  // 全部 600 条词条均有预生成音频
-  var AUDIO_V = 2;         // 音频缓存版本：v2 修复 26-200 错位，配合 SW v10 强制取新音频
+  var AUDIO_V = 3;         // 音频缓存版本：v3 用当前 data.js 词条全量重生成，修复音频-词条错位
   function playRecite(id, text) {
     if (!text && id == null) return;
     var btn = document.getElementById("reciteBtn");
