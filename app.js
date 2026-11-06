@@ -388,15 +388,18 @@ try { (function () {
     if (id == null || id > AUDIO_MAX_ID) { speakFallback(text); return; }
     var au = new Audio("audio/" + id + ".mp3?v=" + AUDIO_V);
     _curAudio = au;
+    try { document.body.appendChild(au); } catch (e) {}
+    // 兜底延长到 5s，兼容手机慢网（避免正常音频被误判走 TTS）
     _curFallbackTimer = setTimeout(function () {
       _curFallbackTimer = null;
       if (_curAudio === au) { try { _curAudio.pause(); _curAudio.src = ""; } catch (e) {} _curAudio = null; }
       speakFallback(text);
-    }, 1800);
+    }, 5000);
     au.oncanplay = function () {
       if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
       if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
-      au.play();
+      // 兜底：若同步栈内 play 未生效（极少见），这里补一次
+      if (au.paused) { var pp = au.play(); if (pp && pp.catch) pp.catch(function () {}); }
     };
     au.onerror = function () {
       if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
@@ -404,7 +407,19 @@ try { (function () {
       speakFallback(text);
     };
     au.onended = function () { if (_curAudio === au) _curAudio = null; };
-    au.load();
+    // ★关键：在用户点击的同步栈内直接 play()，满足 iOS/移动端 autoplay 手势策略
+    // （之前的 oncanplay 异步回调里 play 在 iOS Safari 会被拒绝 → 静音）
+    var p = au.play();
+    if (p && p.catch) {
+      p.catch(function () {
+        // 手势内 play 被拒（极少见），等可播放后补一次
+        var onready = function () {
+          au.removeEventListener("canplay", onready);
+          var pp = au.play(); if (pp && pp.catch) pp.catch(function () {});
+        };
+        au.addEventListener("canplay", onready, { once: true });
+      });
+    }
   }
 
   /* ---------------- 诗词成语库（第一栏） ---------------- */
