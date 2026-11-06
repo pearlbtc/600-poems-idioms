@@ -362,8 +362,23 @@ try { (function () {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.onvoiceschanged = function () { _zhVoice = pickZhVoice(); };
   }
+  // 轻量 toast 提示：微信内失败不再静默，用户能看到发生了什么
+  function showToast(msg, ms) {
+    try {
+      var t = document.getElementById("__toast");
+      if (!t) {
+        t = document.createElement("div");
+        t.id = "__toast";
+        t.style.cssText = "position:fixed;left:50%;bottom:86px;transform:translateX(-50%);max-width:86%;background:rgba(0,0,0,.82);color:#fff;font-size:13px;line-height:1.5;padding:9px 14px;border-radius:10px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s;text-align:center;";
+        document.body.appendChild(t);
+      }
+      t.textContent = msg; t.style.opacity = "1";
+      clearTimeout(t._t); t._t = setTimeout(function () { t.style.opacity = "0"; }, ms || 2800);
+    } catch (e) {}
+  }
+  // 返回 true 表示确实尝试发起了 TTS（便于判断是否还有兜底）
   function speakFallback(text) {
-    if (!("speechSynthesis" in window)) return;
+    if (!("speechSynthesis" in window)) return false;
     try {
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
@@ -371,7 +386,8 @@ try { (function () {
       var v = _zhVoice || pickZhVoice();
       if (v) u.voice = v;
       window.speechSynthesis.speak(u);
-    } catch (e) {}
+      return true;
+    } catch (e) { return false; }
   }
   var _curAudio = null;
   var _curFallbackTimer = null;
@@ -384,40 +400,60 @@ try { (function () {
   var AUDIO_V = 2;         // 音频缓存版本：v2 修复 26-200 错位，配合 SW v10 强制取新音频
   function playRecite(id, text) {
     if (!text && id == null) return;
+    var btn = document.getElementById("reciteBtn");
+    var setBtn = function (s) { if (btn) btn.textContent = s; };
     stopRecite();
-    if (id == null || id > AUDIO_MAX_ID) { speakFallback(text); return; }
+    if (id == null || id > AUDIO_MAX_ID) {
+      var f0 = speakFallback(text);
+      showToast(f0 ? "已用语音朗读（微信内可能无声）" : "当前环境不支持语音，请用系统浏览器打开");
+      return;
+    }
+    setBtn("♪ 朗读中…");
     var au = new Audio("audio/" + id + ".mp3?v=" + AUDIO_V);
+    // 微信 X5 / iOS 内嵌 WebView：需这些属性，否则可能不播或被系统播放器劫持
+    au.setAttribute("playsinline", "");
+    au.setAttribute("webkit-playsinline", "");
+    au.setAttribute("x5-playsinline", "");
+    au.preload = "auto";
     _curAudio = au;
     try { document.body.appendChild(au); } catch (e) {}
-    // 兜底延长到 5s，兼容手机慢网（避免正常音频被误判走 TTS）
-    _curFallbackTimer = setTimeout(function () {
-      _curFallbackTimer = null;
-      if (_curAudio === au) { try { _curAudio.pause(); _curAudio.src = ""; } catch (e) {} _curAudio = null; }
-      speakFallback(text);
-    }, 5000);
-    au.oncanplay = function () {
+    try { au.load(); } catch (e) {}
+    var done = false;
+    function succeed() {
+      if (done) return; done = true;
       if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
       if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
-      // 兜底：若同步栈内 play 未生效（极少见），这里补一次
-      if (au.paused) { var pp = au.play(); if (pp && pp.catch) pp.catch(function () {}); }
-    };
-    au.onerror = function () {
+      setBtn("🔊 诵读");
+    }
+    function fail(reason) {
+      if (done) return; done = true;
       if (_curFallbackTimer) { clearTimeout(_curFallbackTimer); _curFallbackTimer = null; }
       if (_curAudio === au) _curAudio = null;
-      speakFallback(text);
-    };
-    au.onended = function () { if (_curAudio === au) _curAudio = null; };
+      var ok = speakFallback(text);
+      if (!("speechSynthesis" in window) || !ok) {
+        setBtn("⚠ 无法朗读");
+        showToast("音频未播放，且当前环境不支持语音。点右上角 ⋮ →「在浏览器打开」");
+      } else {
+        setBtn("🔊 诵读");
+        showToast("音频未播放，已尝试语音朗读（微信内可能无声，建议在浏览器打开）");
+      }
+    }
+    // 5s 兜底：若其实已经在播（X5 有时不触发 oncanplay），不要误判
+    _curFallbackTimer = setTimeout(function () {
+      if (_curAudio && !_curAudio.paused && _curAudio.currentTime > 0) { succeed(); return; }
+      fail("timeout");
+    }, 5000);
+    au.oncanplay = succeed;
+    au.onerror = function () { fail("error"); };
+    au.onended = function () { setBtn("🔊 诵读"); };
     // ★关键：在用户点击的同步栈内直接 play()，满足 iOS/移动端 autoplay 手势策略
-    // （之前的 oncanplay 异步回调里 play 在 iOS Safari 会被拒绝 → 静音）
     var p = au.play();
     if (p && p.catch) {
       p.catch(function () {
-        // 手势内 play 被拒（极少见），等可播放后补一次
-        var onready = function () {
-          au.removeEventListener("canplay", onready);
+        // 手势内 play 被拒，等可播放再补一次
+        au.addEventListener("canplay", function () {
           var pp = au.play(); if (pp && pp.catch) pp.catch(function () {});
-        };
-        au.addEventListener("canplay", onready, { once: true });
+        }, { once: true });
       });
     }
   }
@@ -816,6 +852,15 @@ try { (function () {
   }
 
   /* ---------------- 启动 ---------------- */
+  // 微信环境提示：微信内置浏览器对 HTML5 音频/TTS 支持差，提前告知用户
+  try {
+    if (/MicroMessenger/i.test(navigator.userAgent)) {
+      var _wx = document.createElement("div");
+      _wx.style.cssText = "position:fixed;top:0;left:0;right:0;background:#b8860b;color:#fff;font-size:12.5px;line-height:1.55;padding:7px 12px;z-index:9998;text-align:center;";
+      _wx.innerHTML = "⚠ 微信内朗读可能无声，点右上角 ⋮ →「在浏览器打开」体验更佳";
+      document.body.appendChild(_wx);
+    }
+  } catch (e) {}
   try {
     if (!ENTRIES.length) {
       view.innerHTML = '<div class="empty">数据未加载（ENTRIES 为空）。<br>请确认 data.js 与 index.html 在同一目录，并刷新页面。</div>';
