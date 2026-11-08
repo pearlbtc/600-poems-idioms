@@ -230,7 +230,10 @@ try { (function () {
   function buildQuiz() {
     var count = Math.min(ROUND_CAP, roundCount(state.round));
     var main = quizPool();
-    var supplement = main.fromToday ? roundPool(state.round) : [];
+    // 补足题同样排除已掌握词条，避免「刚答对又考一遍」
+    var supplement = main.fromToday
+      ? roundPool(state.round).filter(function (id) { return !state.mastered[id]; })
+      : [];
     var all = selectedEntries().map(function (e) { return e.id; });
     function shuf(arr) {
       var a = arr.slice();
