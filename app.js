@@ -173,27 +173,30 @@ try { (function () {
     setTab("study");
   }
 
-  // 出题池：优先今日已学未掌握；全掌握后从勾选文集全量随机
+  // 出题主池：优先「今日已学且未掌握」；这组全部掌握后，从勾选文集全量随机。
+  // ★返回 {ids, fromToday}，buildQuiz 据此判断是否需要用轮次难度池补足题量。
   function quizPool() {
-    var lt = state.learnedToday.ids;
-    var un = lt.filter(function (id) { return !state.mastered[id]; });
-    if (un.length) return un;
-    return selectedEntries().map(function (e) { return e.id; });
+    var lt = state.learnedToday.ids || [];
+    var un = lt.filter(function (id) { return BY_ID[id] && !state.mastered[id]; });
+    if (un.length) return { ids: un, fromToday: true };
+    return { ids: selectedEntries().map(function (e) { return e.id; }), fromToday: false };
   }
 
-  // 难度分层：第1轮只用最短、最熟悉常用的词，之后逐轮加入更长的词
+  // 难度分层：按整条汉字数（chars）排序，短句先出、长句逐轮加入。
+  // ★不再依赖 easy 字段——build_data.py 不生成它，各产品数据里全是空/false，
+  //   旧写法会让第1轮池为空、直接兜底成全书随机，「越往后越难」从未生效。
   function roundPool(round) {
     var all = selectedEntries();
-    // 第1轮：easy 且字数 <= 6，避免长句上手太难
-    var easy = all.filter(function (e) { return e.easy && e.chars <= 6; });
-    // 兜底：如果 easy 短词不够，放宽到所有 easy
-    if (easy.length < 10) easy = all.filter(function (e) { return e.easy; });
-    var hard = all.filter(function (e) { return !e.easy || e.chars > 6; });
+    var sorted = all.slice().sort(function (a, b) { return a.chars - b.chars; });
+    var half = Math.max(10, Math.ceil(sorted.length / 2));
+    var easy = sorted.slice(0, half);
+    var hard = sorted.slice(half);
+    if (!hard.length) hard = easy.slice();
     var pool;
     if (round <= 1) {
       pool = easy.slice();
     } else {
-      // 第2轮起：常用词 + 部分较生字，轮次越高较生字占比越大
+      // 第2轮起：短句 + 部分长句，轮次越高长句占比越大
       var hardTake = Math.min(hard.length, Math.round(hard.length * Math.min(1, (round - 1) / 5)));
       var shuffledHard = hard.slice().sort(function () { return Math.random() - 0.5; }).slice(0, hardTake);
       pool = easy.concat(shuffledHard);
@@ -222,22 +225,37 @@ try { (function () {
     return { entryId: entry.id, tokens: tokens, answer: answer, typed: null, answered: false, correct: false };
   }
 
+    // 出题顺序：① 今日已学未掌握 → ② 本轮难度池补足 → ③ 全书兜底。
+  // 今日组全部掌握后 quizPool() 直接返回全书，于是等价于「从全书随机」。
   function buildQuiz() {
     var count = Math.min(ROUND_CAP, roundCount(state.round));
-    // 轮次池优先，且优先今日已学未掌握；都不够再补全书
-    var roundIds = roundPool(state.round);
-    var unmasteredRound = roundIds.filter(function (id) { return !state.mastered[id]; });
-    var pool = unmasteredRound.length ? unmasteredRound : roundIds;
+    var main = quizPool();
+    var supplement = main.fromToday ? roundPool(state.round) : [];
     var all = selectedEntries().map(function (e) { return e.id; });
+    function shuf(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
     var used = {};
     var qs = [];
-    for (var k = 0; k < count; k++) {
-      var cand = pool.filter(function (id) { return !used[id]; });
-      if (!cand.length) cand = all.filter(function (id) { return !used[id]; });
-      if (!cand.length) cand = all;
-      var id = pick(cand);
-      used[id] = true;
-      qs.push(makeQuestion(BY_ID[id]));
+    function take(ids) {
+      for (var i = 0; i < ids.length && qs.length < count; i++) {
+        var id = ids[i];
+        if (used[id] || !BY_ID[id]) continue;
+        used[id] = true;
+        qs.push(makeQuestion(BY_ID[id]));
+      }
+    }
+    take(shuf(main.ids));
+    take(shuf(supplement));
+    take(shuf(all));
+    // 极端兜底：全书条目数比本轮题量还少时允许重复，避免题目不足
+    while (qs.length < count && all.length) {
+      qs.push(makeQuestion(BY_ID[pick(all)]));
     }
     return qs;
   }
@@ -574,7 +592,7 @@ try { (function () {
     html += '  <div><div class="k">本轮题量</div><div class="v">' + count + " 题</div></div>";
     html += '  <div><div class="k">历史最好</div><div class="v">' + best + " 分</div></div>";
     html += "</div>";
-    html += '<div class="hint">规则：挖空填字，每轮满分 100 分，<b>&#8805;90 分</b>即可晋级下一轮。<br>第1轮用最熟悉常用的词，越往后越难。<br>题目优先出自今日已学内容，全部掌握后从全书随机。</div>';
+    html += '<div class="hint">规则：挖空填字，每轮满分 100 分，<b>&#8805;90 分</b>即可晋级下一轮。<br>第1轮先出短句，越往后长句越多。<br>题目优先出自今日已学内容，全部掌握后从全书随机。</div>';
     html += '<div class="card-actions" style="margin-top:20px;flex-direction:column">';
     html += '  <button class="btn btn-primary" id="startBtn" style="font-size:17px;padding:13px 34px">开始第 ' + state.round + " 轮自测</button>";
     html += '  <button class="btn btn-ghost" id="skipBtn" style="font-size:14px;padding:10px 24px;margin-top:8px">跳过测试，直接进入下一组学习</button>';

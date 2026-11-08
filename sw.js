@@ -1,5 +1,5 @@
 /* 600个绝美的诗词成语在线学习小工具 — Service Worker：离线缓存，让网页版在手机上像原生 App 一样可用 */
-const CACHE = "mtbj-v12";  // v12: 音频改由浏览器原生处理（修复 SW 拦截 .mp3 导致 ERR_ABORTED / 朗诵无语音）
+const CACHE = "mtbj-v14";  // v12: 音频改由浏览器原生处理（修复 SW 拦截 .mp3 导致 ERR_ABORTED / 朗诵无语音）
 const CORE = [
   "./",
   "index.html",
